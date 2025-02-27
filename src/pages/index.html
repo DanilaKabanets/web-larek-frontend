@@ -1,5 +1,6 @@
 <!doctype html>
 <html class="no-js" lang="ru">
+
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
@@ -14,6 +15,7 @@
 	<title>WebLarek</title>
 	<meta name="description" content="">
 </head>
+
 <body class="page">
 	<div class="page__wrapper">
 		<header class="header">
@@ -39,7 +41,7 @@
 		</div>
 	</div>
 
-	<div class="modal modal_active">
+	<div class="modal">
 		<div class="modal__container">
 			<button class="modal__close" aria-label="закрыть"></button>
 			<div class="modal__content">
@@ -128,11 +130,14 @@
 					<div class="order">
 						<label class="order__field">
 							<span class="form__label modal__title">Email</span>
-							<input class="form__input" type="text" placeholder="Введите Email" />
+							<input name="email" class="form__input" type="email" placeholder="Введите Email"
+								pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
+								title="Введите корректный email (например, example@domain.com)" required />
 						</label>
 						<label class="order__field">
 							<span class="form__label modal__title">Телефон</span>
-							<input class="form__input" type="text" placeholder="+7 (" />
+							<input name="phone" class="form__input" type="tel" placeholder="+7" pattern="\+7\d{10}"
+								title="Введите телефон в формате +7XXXXXXXXXX" required />
 						</label>
 					</div>
 					<div class="modal__actions">
@@ -235,11 +240,14 @@
 			<div class="order">
 				<label class="order__field">
 					<span class="form__label modal__title">Email</span>
-					<input name="email" class="form__input" type="text" placeholder="Введите Email" />
+					<input name="email" class="form__input" type="email" placeholder="Введите Email"
+						pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
+						title="Введите корректный email (например, example@domain.com)" required />
 				</label>
 				<label class="order__field">
 					<span class="form__label modal__title">Телефон</span>
-					<input name="phone" class="form__input" type="text" placeholder="+7 (" />
+					<input name="phone" class="form__input" type="tel" placeholder="+7" pattern="\+7\d{10}"
+						title="Введите телефон в формате +7XXXXXXXXXX" required />
 				</label>
 			</div>
 			<div class="modal__actions">
@@ -249,4 +257,5 @@
 		</form>
 	</template>
 </body>
+
 </html>
