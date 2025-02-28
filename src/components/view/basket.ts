@@ -1,32 +1,39 @@
-import { IProduct, IBasket } from '../../types';
 import { handlePrice, cloneTemplate } from '../../utils/utils';
 import { Component } from '../base/component';
 import { IEvents } from '../base/events';
-import { BaseCard, IBaseCard } from '../base/baseCard';
+import { Card, ICard } from './card';
+import { IBasketModel } from '../model/basket';
 
 /**
- * Класс, реализующий корзину товаров по шаблону MVP
- * Объединяет функциональность хранения данных и их отображения
+ * Интерфейс представления корзины
  */
-export class Basket extends Component<Record<string, unknown>> implements IBasket {
+export interface IBasketView {
+    renderBasketItems(template: HTMLTemplateElement): HTMLElement[];
+    updateView(): void;
+    list: HTMLElement[];
+}
+
+/**
+ * Класс представления корзины, отвечающий за отображение данных
+ */
+export class BasketView extends Component<Record<string, unknown>> implements IBasketView {
     // Ссылки на внутренние элементы представления
     protected _list: HTMLElement;
     protected _price: HTMLElement;
     protected _button: HTMLButtonElement;
 
-    // Хранилище товаров (модель)
-    private products: Map<string, IProduct> = new Map();
-
     /**
-     * Создаёт экземпляр корзины
+     * Создаёт экземпляр представления корзины
      * @param blockName - имя блока в DOM
      * @param container - корневой элемент корзины
      * @param events - брокер событий
+     * @param model - модель корзины
      */
     constructor(
         protected blockName: string,
         container: HTMLElement,
-        protected events: IEvents
+        protected events: IEvents,
+        protected model: IBasketModel
     ) {
         super(container);
 
@@ -50,47 +57,9 @@ export class Basket extends Component<Record<string, unknown>> implements IBaske
         if (this._button) {
             this._button.addEventListener('click', () => this.events.emit('basket:order'));
         }
-    }
 
-    /**
-     * Добавляет товар в корзину
-     * @param product - товар для добавления
-     */
-    addProduct(product: IProduct): void {
-        this.products.set(product.id, product);
-        this.emitChange();
-    }
-
-    /**
-     * Удаляет товар из корзины
-     * @param id - идентификатор товара
-     */
-    removeProduct(id: string): void {
-        this.products.delete(id);
-        this.emitChange();
-    }
-
-    /**
-     * Возвращает все товары в корзине
-     */
-    getProducts(): IProduct[] {
-        return Array.from(this.products.values());
-    }
-
-    /**
-     * Рассчитывает общую стоимость корзины
-     */
-    getTotal(): number {
-        return [...this.products.values()]
-            .reduce((total, item) => total + (item.price || 0), 0);
-    }
-
-    /**
-     * Очищает корзину
-     */
-    clearBasket(): void {
-        this.products.clear();
-        this.emitChange();
+        // Подписываемся на изменения в модели
+        this.events.on('basket:changed', () => this.updateView());
     }
 
     /**
@@ -99,19 +68,21 @@ export class Basket extends Component<Record<string, unknown>> implements IBaske
      * @returns Массив HTML-элементов
      */
     renderBasketItems(template: HTMLTemplateElement): HTMLElement[] {
-        return this.getProducts().map((item, index) => {
+        return this.model.getProducts().map((item, index) => {
             const itemElement = cloneTemplate<HTMLElement>(template);
-            const basketItem = new StoreItemBasket('basket', itemElement, {
+            const basketItem = new StoreItemBasket(itemElement, {
                 onClick: () => {
-                    this.removeProduct(item.id);
+                    this.model.removeProduct(item.id);
                 }
             });
 
-            basketItem.title = item.title;
-            basketItem.index = index + 1;
-            basketItem.price = item.price || 0;
-
-            return basketItem.render({});
+            // Устанавливаем данные и возвращаем отрендеренный элемент
+            return basketItem.render({
+                title: item.title,
+                price: item.price || 0,
+                index: index + 1,
+                id: item.id
+            });
         });
     }
 
@@ -131,12 +102,12 @@ export class Basket extends Component<Record<string, unknown>> implements IBaske
      */
     updateView(): void {
         if (this._price) {
-            this._price.textContent = handlePrice(this.getTotal()) + ' синапсов';
+            this._price.textContent = handlePrice(this.model.getTotal()) + ' синапсов';
         }
 
         // Обновляем состояние кнопки
         if (this._button) {
-            this._button.disabled = this.getProducts().length === 0;
+            this._button.disabled = this.model.getProducts().length === 0;
         }
     }
 
@@ -170,41 +141,31 @@ export class Basket extends Component<Record<string, unknown>> implements IBaske
             }
         });
     }
-
-    /**
-     * Генерирует событие изменения корзины
-     */
-    private emitChange(): void {
-        this.events.emit('basket:changed', this.getProducts());
-        this.updateView();
-    }
 }
 
-export interface IProductBasket extends IBaseCard {
-    index: number;
+/**
+ * Интерфейс для товара в корзине
+ */
+export interface IProductBasket extends ICard {
+    index?: number;
 }
 
 export interface IStoreItemBasketActions {
     onClick: (event: MouseEvent) => void;
 }
 
-export class StoreItemBasket extends BaseCard<IProductBasket> {
+/**
+ * Класс для отображения товара в корзине
+ */
+export class StoreItemBasket extends Card {
     protected _index: HTMLElement;
 
     constructor(
-        protected blockName: string,
         container: HTMLElement,
         actions?: IStoreItemBasketActions
     ) {
-        // Вызываем конструктор базового класса с селекторами для элементов
-        super(
-            blockName,
-            container,
-            '.card__title',
-            '.card__price',
-            '.basket__item-delete',
-            actions
-        );
+        // Вызываем конструктор базового класса
+        super(container, actions, 'basket');
 
         // Находим специфичный для корзины элемент индекса
         this._index = container.querySelector('.basket__item-index');
@@ -224,11 +185,23 @@ export class StoreItemBasket extends BaseCard<IProductBasket> {
         }
     }
 
+    /**
+     * Устанавливает индекс товара в корзине
+     */
     set index(value: number) {
-        if (!this._index) {
-            console.error('Элемент basket__item-index не найден в шаблоне корзины');
-            return;
+        if (this._index) {
+            this._index.textContent = value.toString();
         }
-        this._index.textContent = value.toString();
+    }
+
+    /**
+     * Рендерит карточку товара в корзине
+     * @param data - данные для отображения
+     * @returns HTML-элемент карточки
+     */
+    render(data: IProductBasket): HTMLElement {
+        super.render(data);
+        if (data.index) this.index = data.index;
+        return this.container;
     }
 }
