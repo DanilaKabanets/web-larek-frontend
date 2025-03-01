@@ -1,35 +1,22 @@
 import './scss/styles.scss';
 
-import { WebLarekAPIModel } from './components/model/webLarekAPI';
+import { WebLarekAPI } from './components/base/webLarekAPI';
 import { BasketModel } from './components/model/basket';
 import { PageModel } from './components/model/page';
-import { ModalModel } from './components/model/modal';
 import { OrderModel } from './components/model/order';
 
 import { Page } from './components/view/page';
-import { ModalView } from './components/view/modal';
+import { Modal } from './components/view/modal';
 import { OrderView } from './components/view/order';
 import { BasketView } from './components/view/basket';
 
 import { EventEmitter } from './components/base/events';
-import { IProduct, IOrderDto } from './types';
-import { ensureElement, cloneTemplate, handlePrice } from './utils/utils';
+import { IProduct, IOrder, TPaymentType, IOrderSuccess } from './types';
+import { ensureElement, cloneTemplate, handlePrice, isBoolean } from './utils/utils';
 import { Card } from './components/view/card';
 import { API_URL } from './utils/constants';
 
-// Инициализация брокера событий
-const events = new EventEmitter();
-
-// === Модели ===
-// Инициализация моделей
-const apiModel = new WebLarekAPIModel('catalog', API_URL);
-const pageModel = new PageModel(events);
-const basketModel = new BasketModel(events);
-const modalModel = new ModalModel(events);
-const orderModel = new OrderModel(events);
-
 // === Шаблоны ===
-// Получение шаблонов
 const cardCatalogTemplate = ensureElement<HTMLTemplateElement>('#card-catalog');
 const cardPreviewTemplate = ensureElement<HTMLTemplateElement>('#card-preview');
 const basketItemTemplate = ensureElement<HTMLTemplateElement>('#card-basket');
@@ -39,16 +26,37 @@ const contactsTemplate = ensureElement<HTMLTemplateElement>('#contacts');
 const successTemplate = ensureElement<HTMLTemplateElement>('#success');
 const modalContainerElement = ensureElement<HTMLElement>('#modal-container');
 
+// === Инициализация ===
+// Брокер событий
+const events = new EventEmitter();
+
+// === Модели ===
+const apiModel = new WebLarekAPI('catalog', API_URL);
+const pageModel = new PageModel(events);
+const basketModel = new BasketModel(events);
+const orderModel = new OrderModel(events);
+
 // === Представления ===
-// Инициализация представлений
 const page = new Page(document.body, events);
-const modal = new ModalView(modalContainerElement, events, modalModel, page);
+const modal = new Modal(modalContainerElement, events);
 
 // Инициализация контейнера корзины
 const basketContainer = cloneTemplate<HTMLElement>(basketTemplate);
-const basketView = new BasketView('basket', basketContainer, events, basketModel);
+const basketView = new BasketView('basket', basketContainer, events);
 
 // === Обработчики событий ===
+
+// Обработчик блокировки/разблокировки страницы при открытии/закрытии модального окна
+events.on('modal:open', () => {
+    if (isBoolean(true)) {
+        pageModel.setLocked(true);
+    }
+});
+events.on('modal:close', () => {
+    if (isBoolean(false)) {
+        pageModel.setLocked(false);
+    }
+});
 
 // Отображение списка товаров
 events.on('products:changed', (products: IProduct[]) => {
@@ -71,12 +79,12 @@ events.on('product:select', (product: IProduct) => {
     const card = new Card(cardElement, {
         onClick: () => {
             basketModel.addProduct(product);
-            modalModel.close();
+            modal.close();
         }
     });
 
     modal.content = card.render(product);
-    modalModel.open();
+    modal.open();
 });
 
 // Обновление состояния корзины
@@ -92,14 +100,14 @@ events.on('basket:open', () => {
     const basketItems = basketView.renderBasketItems(basketItemTemplate);
 
     // Обновляем список элементов корзины
-    basketView.list = basketItems;
+    basketView.items = basketItems;
 
     // Обновляем отображение корзины (цена, активность кнопки)
     basketView.updateView();
 
     // Отображаем корзину в модальном окне
     modal.content = basketContainer;
-    modalModel.open();
+    modal.open();
 });
 
 // Оформление заказа
@@ -108,42 +116,91 @@ events.on('basket:order', () => {
     const orderElement = cloneTemplate<HTMLFormElement>(orderTemplate);
 
     // Создаем представление формы заказа
-    new OrderView(orderElement, events, orderModel);
+    new OrderView(orderElement, events);
 
     // Отображаем форму заказа в модальном окне
     modal.content = orderElement;
 });
 
-// Обработка отправки формы заказа
+// Обработчик события order:submit - переход от формы заказа к форме контактов
 events.on('order:submit', () => {
     // Клонируем шаблон формы контактов
     const contactsElement = cloneTemplate<HTMLFormElement>(contactsTemplate);
 
-    // Создаем представление формы контактов с той же моделью заказа
-    new OrderView(contactsElement, events, orderModel);
+    // Создаем представление формы контактов
+    new OrderView(contactsElement, events);
 
     // Отображаем форму контактов в модальном окне
     modal.content = contactsElement;
 });
 
-// Обработка отправки формы контактов
-events.on('contacts:submit', (contactsData: { email: string, phone: string }) => {
-    // Собираем полные данные заказа из объединенной модели
-    const completeOrderData: IOrderDto = {
+// Обработка отправки заказа
+events.on('order:data', (orderData: unknown) => {
+    // Формируем данные для отправки
+    const basketItems = basketModel.getProducts().map(item => item.id);
+    const typedOrderData = orderData as { email: string; phone: string; address: string; payment: TPaymentType };
+
+    const orderDto: IOrder = {
+        payment: typedOrderData.payment,
+        email: typedOrderData.email,
+        phone: typedOrderData.phone,
+        address: typedOrderData.address,
         total: basketModel.getTotal(),
-        items: basketModel.getProducts().map(item => item.id),
-        ...orderModel.getData()  // Используем данные из модели заказа
+        items: basketItems
     };
 
-    // Отправляем заказ на сервер
-    apiModel.postOrderLot(completeOrderData)
-        .then(() => {
-            // Оповещаем об успешном оформлении заказа
-            events.emit('order:completed', { total: completeOrderData.total });
+    // Отправляем заказ
+    apiModel.postOrderLot(orderDto)
+        .then((result: IOrderSuccess) => {
+            // Очищаем корзину после успешного заказа
+            basketModel.clearBasket();
+
+            // Отображаем сообщение об успешном оформлении заказа
+            const successElement = cloneTemplate<HTMLElement>(successTemplate);
+            modal.content = successElement;
+
+            // Находим и обновляем информацию о номере заказа и сумме
+            const idElement = successElement.querySelector('.order-success__number');
+            const totalElement = successElement.querySelector('.order-success__total');
+            const descriptionElement = successElement.querySelector('.order-success__description');
+            const closeButton = successElement.querySelector('.order-success__close');
+
+            if (idElement) {
+                idElement.textContent = result.id;
+            }
+            if (totalElement) {
+                totalElement.textContent = handlePrice(result.total);
+            }
+            if (descriptionElement) {
+                descriptionElement.textContent = `Списано ${handlePrice(result.total)} синапсов`;
+            }
+
+            // Добавляем обработчик клика на кнопку "За новыми покупками"
+            if (closeButton) {
+                closeButton.addEventListener('click', () => {
+                    modal.close();
+                });
+            }
         })
         .catch((error: Error) => {
             console.error('Ошибка при оформлении заказа:', error);
         });
+});
+
+// Обработка отправки формы контактов
+events.on('contacts:submit', (contactsData: { email: string, phone: string }) => {
+    // Получаем текущие данные заказа
+    const orderData = orderModel.getData();
+
+    // Объединяем данные заказа и контактов
+    const fullOrderData = {
+        ...orderData,
+        email: contactsData.email,
+        phone: contactsData.phone
+    };
+
+    // Вызываем событие для отправки заказа на сервер
+    events.emit('order:data', fullOrderData);
 });
 
 // Обработка успешного оформления заказа
@@ -163,7 +220,7 @@ events.on('order:completed', (data: { total: number }) => {
     // Добавляем обработчик клика на кнопку "За новыми покупками"
     if (closeButton) {
         closeButton.addEventListener('click', () => {
-            modalModel.close();
+            modal.close();
         });
     }
 

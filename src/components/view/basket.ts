@@ -1,8 +1,7 @@
-import { handlePrice, cloneTemplate } from '../../utils/utils';
+import { handlePrice, cloneTemplate, ensureElement, createElement } from '../../utils/utils';
 import { Component } from '../base/component';
 import { IEvents } from '../base/events';
-import { Card, ICard } from './card';
-import { IBasketModel } from '../model/basket';
+import { IProduct } from '../../types';
 
 /**
  * Интерфейс представления корзины
@@ -10,7 +9,7 @@ import { IBasketModel } from '../model/basket';
 export interface IBasketView {
     renderBasketItems(template: HTMLTemplateElement): HTMLElement[];
     updateView(): void;
-    list: HTMLElement[];
+    items: HTMLElement[];
 }
 
 /**
@@ -22,68 +21,49 @@ export class BasketView extends Component<Record<string, unknown>> implements IB
     protected _price: HTMLElement;
     protected _button: HTMLButtonElement;
 
+    // Данные корзины
+    private _products: IProduct[] = [];
+    private _total = 0;
+
     /**
      * Создаёт экземпляр представления корзины
      * @param blockName - имя блока в DOM
      * @param container - корневой элемент корзины
      * @param events - брокер событий
-     * @param model - модель корзины
      */
     constructor(
         protected blockName: string,
         container: HTMLElement,
-        protected events: IEvents,
-        protected model: IBasketModel
+        protected events: IEvents
     ) {
         super(container);
 
-        // Инициализация DOM-элементов
-        this._button = container.querySelector(`.${blockName}__button`);
-        this._price = container.querySelector(`.${blockName}__price`);
-        this._list = container.querySelector(`.${blockName}__list`);
-
-        // Проверка наличия необходимых элементов
-        if (!this._button) {
-            console.warn(`Элемент ${blockName}__button не найден в корзине`);
-        }
-        if (!this._price) {
-            console.warn(`Элемент ${blockName}__price не найден в корзине`);
-        }
-        if (!this._list) {
-            console.warn(`Элемент ${blockName}__list не найден в корзине`);
+        // Инициализация DOM-элементов с использованием ensureElement
+        try {
+            this._button = ensureElement<HTMLButtonElement>(`.${blockName}__button`, container);
+            this._price = ensureElement<HTMLElement>(`.${blockName}__price`, container);
+            this._list = ensureElement<HTMLElement>(`.${blockName}__list`, container);
+        } catch (e) {
+            console.warn(`Ошибка при инициализации элементов корзины: ${e.message}`);
         }
 
-        // Добавляем обработчик события заказа
-        if (this._button) {
-            this._button.addEventListener('click', () => this.events.emit('basket:order'));
-        }
-
-        // Подписываемся на изменения в модели
-        this.events.on('basket:changed', () => this.updateView());
-    }
-
-    /**
-     * Создает HTML-элементы для товаров в корзине
-     * @param template - шаблон элемента корзины
-     * @returns Массив HTML-элементов
-     */
-    renderBasketItems(template: HTMLTemplateElement): HTMLElement[] {
-        return this.model.getProducts().map((item, index) => {
-            const itemElement = cloneTemplate<HTMLElement>(template);
-            const basketItem = new StoreItemBasket(itemElement, {
-                onClick: () => {
-                    this.model.removeProduct(item.id);
-                }
-            });
-
-            // Устанавливаем данные и возвращаем отрендеренный элемент
-            return basketItem.render({
-                title: item.title,
-                price: item.price || 0,
-                index: index + 1,
-                id: item.id
-            });
+        // Подписываемся на события модели
+        this.events.on('basket:changed', (products: IProduct[]) => {
+            this._products = products;
+            this.updateView();
         });
+
+        this.events.on('basket:total-updated', (data: object) => {
+            this._total = (data as { value: number }).value;
+            this.updatePrice();
+        });
+
+        // Добавляем обработчик для кнопки оформления заказа
+        if (this._button) {
+            this._button.addEventListener('click', () => {
+                this.events.emit('basket:checkout');
+            });
+        }
     }
 
     /**
@@ -101,107 +81,92 @@ export class BasketView extends Component<Record<string, unknown>> implements IB
      * Обновляет отображение корзины
      */
     updateView(): void {
-        if (this._price) {
-            this._price.textContent = handlePrice(this.model.getTotal()) + ' синапсов';
-        }
+        this.updatePrice();
+        this.updateButtonState();
 
-        // Обновляем состояние кнопки
+        // Запрашиваем обновление данных о сумме корзины
+        this.events.emit('basket:get-total');
+    }
+
+    /**
+     * Обновляет отображение общей суммы заказа
+     */
+    private updatePrice(): void {
+        if (this._price) {
+            this._price.textContent = handlePrice(this._total) + ' синапсов';
+        }
+    }
+
+    /**
+     * Обновляет состояние кнопки заказа
+     */
+    private updateButtonState(): void {
         if (this._button) {
-            this._button.disabled = this.model.getProducts().length === 0;
+            this._button.disabled = this._products.length === 0;
         }
     }
 
     /**
      * Устанавливает HTML-элементы товаров в списке корзины
      */
-    set list(items: HTMLElement[]) {
+    set items(items: HTMLElement[]) {
         if (!this._list) {
             console.error('Элемент с классом', `${this.blockName}__list`, 'не найден в корзине');
             return;
         }
-        this._list.replaceChildren(...items);
-        if (this._button) {
-            this._button.disabled = !items.length;
+
+        if (items.length > 0) {
+            this._list.replaceChildren(...items);
+            if (this._button) this._button.disabled = false;
+        } else {
+            if (this._button) this._button.disabled = true;
+            this._list.replaceChildren(createElement<HTMLParagraphElement>('p', { textContent: 'Корзина пуста' }));
         }
     }
 
     /**
-     * Обновляет индексы элементов в корзине
+     * Получает HTML-элементы товаров в списке корзины
      */
-    refreshIndices(): void {
-        if (!this._list) {
-            console.error('Элемент с классом', `${this.blockName}__list`, 'не найден в корзине при обновлении индексов');
-            return;
-        }
-
-        Array.from(this._list.children).forEach((item, index) => {
-            const indexElement = item.querySelector(`.basket__item-index`);
-            if (indexElement) {
-                indexElement.textContent = (index + 1).toString();
-            }
-        });
+    get items(): HTMLElement[] {
+        return Array.from(this._list?.children || []) as HTMLElement[];
     }
-}
 
-/**
- * Интерфейс для товара в корзине
- */
-export interface IProductBasket extends ICard {
-    index?: number;
-}
+    /**
+     * Рендерит элементы корзины
+     * @param template - шаблон элемента корзины
+     */
+    renderBasketItems(template: HTMLTemplateElement): HTMLElement[] {
+        // Запрашиваем актуальные данные корзины
+        this.events.emit('basket:get-products');
 
-export interface IStoreItemBasketActions {
-    onClick: (event: MouseEvent) => void;
-}
+        // Генерируем карточки на основе полученных данных
+        const items = this._products.map((product, index) => {
+            const item = cloneTemplate<HTMLElement>(template);
 
-/**
- * Класс для отображения товара в корзине
- */
-export class StoreItemBasket extends Card {
-    protected _index: HTMLElement;
+            // Находим элементы для заполнения
+            const title = item.querySelector('.card__title');
+            const price = item.querySelector('.card__price');
+            const index_element = item.querySelector('.basket__item-index');
+            const deleteButton = item.querySelector('.basket__item-delete');
 
-    constructor(
-        container: HTMLElement,
-        actions?: IStoreItemBasketActions
-    ) {
-        // Вызываем конструктор базового класса
-        super(container, actions, 'basket');
+            // Заполняем данные
+            if (title) title.textContent = product.title;
+            if (price) price.textContent = handlePrice(product.price) + ' синапсов';
+            if (index_element) index_element.textContent = (index + 1).toString();
 
-        // Находим специфичный для корзины элемент индекса
-        this._index = container.querySelector('.basket__item-index');
-
-        // Добавляем специальное поведение для кнопки удаления
-        if (this._button) {
-            // Удаляем предыдущие обработчики (если есть)
-            this._button.replaceWith(this._button.cloneNode(true));
-            this._button = container.querySelector('.basket__item-delete');
-
-            if (this._button && actions?.onClick) {
-                this._button.addEventListener('click', (evt) => {
-                    this.container.remove();
-                    actions.onClick(evt);
+            // Добавляем обработчик для удаления
+            if (deleteButton) {
+                deleteButton.addEventListener('click', () => {
+                    this.events.emit('basket:remove', { id: product.id });
                 });
             }
-        }
-    }
 
-    /**
-     * Устанавливает индекс товара в корзине
-     */
-    set index(value: number) {
-        if (this._index) {
-            this._index.textContent = value.toString();
-        }
-    }
+            return item;
+        });
 
-    /**
-     * Рендерит карточку товара в корзине
-     * @param data - данные для отображения
-     * @returns HTML-элемент карточки
-     */
-    render(data: IProductBasket): HTMLElement {
-        super.render(data);
-        if (data.index) this.index = data.index;
-        return this.container;
+        // Обновляем представление корзины
+        this.items = items;
+
+        return items;
     }
 }

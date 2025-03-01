@@ -56,7 +56,7 @@ export class Card extends Component<ICard> {
             this._title = ensureElement<HTMLElement>(`.${blockName}__title`, container);
             this._price = ensureElement<HTMLElement>(`.${blockName}__price`, container);
         } catch (e) {
-            console.error(`Ошибка при инициализации карточки: ${e.message}`);
+            // Ошибка при инициализации основных элементов карточки
         }
 
         // Для кнопки используем querySelector, так как она может отсутствовать
@@ -186,25 +186,5 @@ export class Card extends Component<ICard> {
         if (data.description) this.description = data.description;
 
         return this.container;
-    }
-}
-
-/**
- * Карточка товара в каталоге
- * Для обратной совместимости
- */
-export class StoreItem extends Card {
-    constructor(container: HTMLElement, actions?: ICardActions) {
-        super(container, actions);
-    }
-}
-
-/**
- * Карточка предпросмотра товара
- * Для обратной совместимости
- */
-export class StoreItemPreview extends Card {
-    constructor(container: HTMLElement, actions?: ICardActions) {
-        super(container, actions);
     }
 }

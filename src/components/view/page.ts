@@ -2,9 +2,9 @@ import { Component } from '../base/component';
 import { IEvents } from '../base/events';
 import { ensureElement } from '../../utils/utils';
 
-/*
-  * Интерфейс описывающий страницу
-  * */
+/**
+ * Интерфейс описывающий страницу
+ */
 interface IPage {
     // Счётчик товаров в корзине
     counter: number;
@@ -17,9 +17,9 @@ interface IPage {
     locked: boolean;
 }
 
-/*
-  * Класс, описывающий главную страницу
-  * */
+/**
+ * Класс, описывающий главную страницу
+ */
 export class Page extends Component<IPage> {
     // Ссылки на внутренние элементы
     protected _counter: HTMLElement;

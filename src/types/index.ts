@@ -18,9 +18,9 @@ export interface IBasket {
 
 export type TPaymentType = 'online' | 'paymentOnDelivery';
 
-export type CategoryType = 'софт-скил' | 'хард-скил' | 'дополнительное' | 'другое';
+export type CategoryType = 'софт-скил' | 'хард-скил' | 'дополнительное' | 'другое' | 'кнопка';
 
-export interface IOrderDto {
+export interface IOrder {
     total: number;
     email: string;
     phone: string;

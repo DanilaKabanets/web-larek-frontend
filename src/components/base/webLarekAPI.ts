@@ -1,4 +1,4 @@
-import { IProduct, IOrderDto } from "../../types";
+import { IProduct, IOrder, IOrderSuccess } from "../../types";
 import { Api, ApiListResponse } from "../base/api";
 import { CDN_URL } from "../../utils/constants";
 
@@ -7,13 +7,13 @@ import { CDN_URL } from "../../utils/constants";
  */
 export interface IWebLarekAPI {
     getProductItems: () => Promise<IProduct[]>;
-    postOrderLot: (order: IOrderDto) => Promise<IOrderDto>;
+    postOrderLot: (order: IOrder) => Promise<IOrderSuccess>;
 }
 
 /**
  * Класс для взаимодействия с API WebLarek
  */
-export class WebLarekAPIModel extends Api implements IWebLarekAPI {
+export class WebLarekAPI extends Api implements IWebLarekAPI {
     readonly cdn: string;
 
     constructor(protected readonly resource: string, baseUrl: string, options?: RequestInit) {
@@ -35,9 +35,9 @@ export class WebLarekAPIModel extends Api implements IWebLarekAPI {
     /**
      * Отправка данных заказа на сервер
      */
-    postOrderLot(order: IOrderDto): Promise<IOrderDto> {
+    postOrderLot(order: IOrder): Promise<IOrderSuccess> {
         return this.post('/order', order).then(
-            (data: IOrderDto) => data
+            (data: IOrderSuccess) => data
         );
     }
 }

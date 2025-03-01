@@ -1,5 +1,6 @@
 import { IEvents } from '../base/events';
 import { IProduct } from '../../types';
+import { isEmpty } from '../../utils/utils';
 
 /**
  * Интерфейс для данных страницы
@@ -42,7 +43,11 @@ export class PageModel implements IPageModel {
      * @param products - список товаров
      */
     setProducts(products: IProduct[]): void {
-        this._products = [...products];
+        if (isEmpty(products)) {
+            this._products = [];
+        } else {
+            this._products = [...products];
+        }
         this.emitChange();
     }
 

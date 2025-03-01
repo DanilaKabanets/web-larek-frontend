@@ -1,6 +1,7 @@
 import { Component } from '../base/component';
 import { IEvents } from '../base/events';
-import { IOrderModel } from '../model/order';
+import { TPaymentType } from '../../types';
+import { ensureElement } from '../../utils/utils';
 
 /**
  * Представление формы заказа
@@ -19,16 +20,22 @@ export class OrderView extends Component<object> {
     // Флаг, указывающий, является ли текущая форма формой контактов
     protected _isContactsForm = false;
 
+    // Флаги состояния данных
+    private _hasAddressAndPayment = false;
+    private _hasContacts = false;
+    private _address = '';
+    private _email = '';
+    private _phone = '';
+    private _payment: TPaymentType | null = null;
+
     /**
      * Создаёт экземпляр представления формы заказа
      * @param container - HTML-элемент формы
      * @param events - брокер событий
-     * @param model - модель формы заказа
      */
     constructor(
         container: HTMLFormElement,
-        private events: IEvents,
-        private model: IOrderModel
+        private events: IEvents
     ) {
         super(container);
 
@@ -45,11 +52,19 @@ export class OrderView extends Component<object> {
 
         // Подписываемся на изменения модели
         if (this._isContactsForm) {
-            this.events.on('contacts:changed', () => {
+            this.events.on('contacts:changed', (data: object) => {
+                const typedData = data as { email: string, phone: string };
+                this._email = typedData.email;
+                this._phone = typedData.phone;
+                this._hasContacts = Boolean(typedData.email && typedData.phone);
                 this.updateContactsView();
             });
         } else {
-            this.events.on('order:changed', () => {
+            this.events.on('order:changed', (data: object) => {
+                const typedData = data as { address: string, payment: TPaymentType };
+                this._address = typedData.address;
+                this._payment = typedData.payment;
+                this._hasAddressAndPayment = Boolean(typedData.address && typedData.payment);
                 this.updateOrderView();
             });
         }
@@ -60,47 +75,46 @@ export class OrderView extends Component<object> {
      * @param container - HTML-элемент формы
      */
     private initOrderForm(container: HTMLFormElement): void {
-        // Получаем ссылки на элементы формы
+        // Получаем ссылки на элементы формы с использованием ensureElement
         this._card = container.elements.namedItem('card') as HTMLButtonElement;
         this._cash = container.elements.namedItem('cash') as HTMLButtonElement;
         this._addressInput = container.elements.namedItem('address') as HTMLInputElement;
-        this._submitButton = container.querySelector('button[type="submit"]') as HTMLButtonElement;
+        this._submitButton = ensureElement<HTMLButtonElement>('button[type="submit"]', container);
 
         // По умолчанию кнопка отправки неактивна
-        if (this._submitButton) {
-            this._submitButton.disabled = true;
-        }
+        this._submitButton.disabled = true;
 
         // Обработчики для кнопок способа оплаты
         if (this._cash) {
             this._cash.addEventListener('click', () => {
                 this._cash.classList.add('button_alt-active');
                 this._card.classList.remove('button_alt-active');
-                // Меняем значение на 'paymentOnDelivery' (оплата при доставке)
-                this.model.setPayment('paymentOnDelivery');
+                // Отправляем событие об изменении способа оплаты
+                this.events.emit('payment:set', { value: 'paymentOnDelivery' });
             });
         }
         if (this._card) {
             this._card.addEventListener('click', () => {
                 this._card.classList.add('button_alt-active');
                 this._cash.classList.remove('button_alt-active');
-                // Меняем значение на 'online' (онлайн-оплата)
-                this.model.setPayment('online');
+                // Отправляем событие об изменении способа оплаты
+                this.events.emit('payment:set', { value: 'online' });
             });
         }
 
         // Добавляем обработчик события ввода для поля адреса
         if (this._addressInput) {
             this._addressInput.addEventListener('input', () => {
-                this.model.setAddress(this._addressInput.value);
+                // Отправляем событие об изменении адреса
+                this.events.emit('address:set', { value: this._addressInput.value });
             });
         }
 
         // Добавляем обработчик отправки формы
         container.addEventListener('submit', (event) => {
             event.preventDefault();
-            if (this.model.isAddressAndPaymentValid) {
-                this.events.emit('order:submit', this.model.getData());
+            if (this._hasAddressAndPayment) {
+                this.events.emit('order:submit');
             }
         });
     }
@@ -113,36 +127,64 @@ export class OrderView extends Component<object> {
         // Получаем ссылки на элементы формы
         this._phoneInput = container.elements.namedItem('phone') as HTMLInputElement;
         this._emailInput = container.elements.namedItem('email') as HTMLInputElement;
-        this._submitButton = container.querySelector('button[type="submit"]') as HTMLButtonElement;
+        this._submitButton = ensureElement<HTMLButtonElement>('button[type="submit"]', container);
 
         // По умолчанию кнопка отправки неактивна
-        if (this._submitButton) {
-            this._submitButton.disabled = true;
-        }
+        this._submitButton.disabled = true;
 
         // Добавляем обработчики событий ввода
         if (this._phoneInput) {
             this._phoneInput.addEventListener('input', () => {
-                this.model.setPhone(this._phoneInput.value);
+                // Проверяем валидность поля перед отправкой события
+                this.validateAndEmitInput(this._phoneInput, 'phone:set');
             });
         }
 
         if (this._emailInput) {
             this._emailInput.addEventListener('input', () => {
-                this.model.setEmail(this._emailInput.value);
+                // Проверяем валидность поля перед отправкой события
+                this.validateAndEmitInput(this._emailInput, 'email:set');
             });
         }
 
         // Добавляем обработчик отправки формы
         container.addEventListener('submit', (event) => {
             event.preventDefault();
-            if (this.model.isContactsValid) {
+            if (this._hasContacts && this.areInputsValid()) {
                 this.events.emit('contacts:submit', {
-                    email: this.model.email,
-                    phone: this.model.phone
+                    email: this._email,
+                    phone: this._phone
                 });
             }
         });
+    }
+
+    /**
+     * Проверяет валидность поля ввода и отправляет событие
+     * @param input - поле ввода
+     * @param eventName - имя события для отправки
+     */
+    private validateAndEmitInput(input: HTMLInputElement, eventName: string): void {
+        const value = input.value;
+        // Отправляем событие об изменении значения
+        this.events.emit(eventName, { value });
+    }
+
+    /**
+     * Проверяет валидность всех полей ввода
+     */
+    private areInputsValid(): boolean {
+        let isValid = true;
+
+        if (this._emailInput) {
+            isValid = isValid && this._emailInput.validity.valid;
+        }
+
+        if (this._phoneInput) {
+            isValid = isValid && this._phoneInput.validity.valid;
+        }
+
+        return isValid;
     }
 
     /**
@@ -151,14 +193,14 @@ export class OrderView extends Component<object> {
     updateOrderView(): void {
         // Обновляем состояние кнопки отправки формы
         if (this._submitButton) {
-            this._submitButton.disabled = !this.model.isAddressAndPaymentValid;
+            this._submitButton.disabled = !this._hasAddressAndPayment;
         }
 
         // Обновляем состояние кнопок способа оплаты
-        if (this.model.payment === 'online') {
+        if (this._payment === 'online') {
             this._card.classList.add('button_alt-active');
             this._cash.classList.remove('button_alt-active');
-        } else if (this.model.payment === 'paymentOnDelivery') {
+        } else if (this._payment === 'paymentOnDelivery') {
             this._cash.classList.add('button_alt-active');
             this._card.classList.remove('button_alt-active');
         } else {
@@ -168,7 +210,7 @@ export class OrderView extends Component<object> {
 
         // Обновляем значение поля адреса
         if (this._addressInput) {
-            this._addressInput.value = this.model.address;
+            this._addressInput.value = this._address;
         }
     }
 
@@ -178,16 +220,16 @@ export class OrderView extends Component<object> {
     updateContactsView(): void {
         // Обновляем состояние кнопки отправки формы
         if (this._submitButton) {
-            this._submitButton.disabled = !this.model.isContactsValid;
+            this._submitButton.disabled = !this._hasContacts || !this.areInputsValid();
         }
 
         // Обновляем значения полей формы
         if (this._phoneInput) {
-            this._phoneInput.value = this.model.phone;
+            this._phoneInput.value = this._phone;
         }
 
         if (this._emailInput) {
-            this._emailInput.value = this.model.email;
+            this._emailInput.value = this._email;
         }
     }
 
@@ -214,6 +256,9 @@ export class OrderView extends Component<object> {
             if (this._emailInput) {
                 this._emailInput.value = '';
             }
+            this._email = '';
+            this._phone = '';
+            this._hasContacts = false;
         } else {
             // Сбрасываем форму заказа
             this._cash.classList.remove('button_alt-active');
@@ -221,6 +266,16 @@ export class OrderView extends Component<object> {
             if (this._addressInput) {
                 this._addressInput.value = '';
             }
+            this._address = '';
+            this._payment = null;
+            this._hasAddressAndPayment = false;
         }
+
+        if (this._submitButton) {
+            this._submitButton.disabled = true;
+        }
+
+        // Отправляем событие сброса формы
+        this.events.emit('order:reset');
     }
 } 
