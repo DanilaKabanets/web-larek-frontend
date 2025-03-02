@@ -59,7 +59,7 @@ export class Modal extends Component<IModalData> {
      */
     open() {
         this.container.classList.add('modal_active');
-        this.lock = true;
+        this.events.emit('page:lock', { value: true });
         this.events.emit('modal:open');
     }
 
@@ -68,7 +68,7 @@ export class Modal extends Component<IModalData> {
      */
     close() {
         this.container.classList.remove('modal_active');
-        this.lock = false;
+        this.events.emit('page:lock', { value: false });
         this.content = null;
         this.events.emit('modal:close');
     }
@@ -77,13 +77,5 @@ export class Modal extends Component<IModalData> {
         super.render(data);
         this.open();
         return this.container;
-    }
-
-    set lock(value: boolean) {
-        if (value) {
-            this.wrapper.classList.add('page__wrapper_locked');
-        } else {
-            this.wrapper.classList.remove('page__wrapper_locked');
-        }
     }
 } 

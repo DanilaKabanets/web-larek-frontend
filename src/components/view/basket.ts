@@ -13,17 +13,20 @@ export interface IBasketView {
 }
 
 /**
+ * Интерфейс данных корзины
+ */
+export interface IBasketData {
+    items: HTMLElement[];
+}
+
+/**
  * Класс представления корзины, отвечающий за отображение данных
  */
-export class BasketView extends Component<Record<string, unknown>> implements IBasketView {
+export class BasketView extends Component<IBasketData> implements IBasketView {
     // Ссылки на внутренние элементы представления
     protected _list: HTMLElement;
     protected _price: HTMLElement;
     protected _button: HTMLButtonElement;
-
-    // Данные корзины
-    private _products: IProduct[] = [];
-    private _total = 0;
 
     /**
      * Создаёт экземпляр представления корзины
@@ -47,15 +50,14 @@ export class BasketView extends Component<Record<string, unknown>> implements IB
             console.warn(`Ошибка при инициализации элементов корзины: ${e.message}`);
         }
 
-        // Подписываемся на события модели
-        this.events.on('basket:changed', (products: IProduct[]) => {
-            this._products = products;
+        // Подписываемся на события модели для обновления представления
+        this.events.on('basket:changed', () => {
             this.updateView();
         });
 
         this.events.on('basket:total-updated', (data: object) => {
-            this._total = (data as { value: number }).value;
-            this.updatePrice();
+            const totalData = data as { value: number };
+            this.updatePrice(totalData.value);
         });
 
         // Добавляем обработчик для кнопки оформления заказа
@@ -81,28 +83,28 @@ export class BasketView extends Component<Record<string, unknown>> implements IB
      * Обновляет отображение корзины
      */
     updateView(): void {
-        this.updatePrice();
-        this.updateButtonState();
-
-        // Запрашиваем обновление данных о сумме корзины
+        // Запрашиваем актуальные данные о сумме корзины
         this.events.emit('basket:get-total');
+
+        // Запрашиваем актуальные данные о товарах для обновления кнопки
+        this.events.emit('basket:get-products');
     }
 
     /**
      * Обновляет отображение общей суммы заказа
      */
-    private updatePrice(): void {
+    private updatePrice(total: number): void {
         if (this._price) {
-            this._price.textContent = handlePrice(this._total) + ' синапсов';
+            this._price.textContent = handlePrice(total) + ' синапсов';
         }
     }
 
     /**
      * Обновляет состояние кнопки заказа
      */
-    private updateButtonState(): void {
+    private updateButtonState(products: IProduct[]): void {
         if (this._button) {
-            this._button.disabled = this._products.length === 0;
+            this._button.disabled = products.length === 0;
         }
     }
 
@@ -136,37 +138,50 @@ export class BasketView extends Component<Record<string, unknown>> implements IB
      * @param template - шаблон элемента корзины
      */
     renderBasketItems(template: HTMLTemplateElement): HTMLElement[] {
-        // Запрашиваем актуальные данные корзины
+        let renderedItems: HTMLElement[] = [];
+
+        // Запрашиваем актуальные данные корзины и ожидаем ответ
         this.events.emit('basket:get-products');
 
-        // Генерируем карточки на основе полученных данных
-        const items = this._products.map((product, index) => {
-            const item = cloneTemplate<HTMLElement>(template);
+        // Подписываемся на событие с продуктами один раз для рендеринга
+        const handleProducts = (products: IProduct[]) => {
+            // Очищаем предыдущие обработчики
+            this.events.off('basket:products', handleProducts);
 
-            // Находим элементы для заполнения
-            const title = item.querySelector('.card__title');
-            const price = item.querySelector('.card__price');
-            const index_element = item.querySelector('.basket__item-index');
-            const deleteButton = item.querySelector('.basket__item-delete');
+            // Обновляем состояние кнопки на основе полученных продуктов
+            this.updateButtonState(products);
 
-            // Заполняем данные
-            if (title) title.textContent = product.title;
-            if (price) price.textContent = handlePrice(product.price) + ' синапсов';
-            if (index_element) index_element.textContent = (index + 1).toString();
+            // Генерируем карточки на основе полученных данных
+            renderedItems = products.map((product, index) => {
+                const item = cloneTemplate<HTMLElement>(template);
 
-            // Добавляем обработчик для удаления
-            if (deleteButton) {
-                deleteButton.addEventListener('click', () => {
-                    this.events.emit('basket:remove', { id: product.id });
-                });
-            }
+                // Находим элементы для заполнения
+                const title = item.querySelector('.card__title');
+                const price = item.querySelector('.card__price');
+                const index_element = item.querySelector('.basket__item-index');
+                const deleteButton = item.querySelector('.basket__item-delete');
 
-            return item;
-        });
+                // Заполняем данные
+                if (title) title.textContent = product.title;
+                if (price) price.textContent = handlePrice(product.price) + ' синапсов';
+                if (index_element) index_element.textContent = (index + 1).toString();
 
-        // Обновляем представление корзины
-        this.items = items;
+                // Добавляем обработчик для удаления
+                if (deleteButton) {
+                    deleteButton.addEventListener('click', () => {
+                        this.events.emit('basket:remove', { id: product.id });
+                    });
+                }
 
-        return items;
+                return item;
+            });
+
+            // Обновляем представление корзины
+            this.items = renderedItems;
+        };
+
+        this.events.on('basket:products', handleProducts);
+
+        return renderedItems;
     }
 }

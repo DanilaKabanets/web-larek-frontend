@@ -39,6 +39,11 @@ export class Page extends Component<IPage> {
         this._basket.addEventListener('click', () => {
             this.events.emit('basket:open');
         });
+
+        // Подписываемся на события блокировки страницы
+        this.events.on('page:lock', (data: { value: boolean }) => {
+            this.locked = data.value;
+        });
     }
 
     // Сеттер для счётчика товаров в корзине
