@@ -3,6 +3,7 @@ import { ensureElement } from '../../utils/utils';
 import { categoryMapping } from '../../utils/constants';
 import { Component } from '../base/component';
 import { handlePrice } from '../../utils/utils';
+import { IEvents } from '../base/events';
 
 /**
  * Интерфейс для действий с карточкой
@@ -43,11 +44,13 @@ export class Card extends Component<ICard> {
      * @param container - корневой элемент карточки
      * @param actions - объект с обработчиками событий
      * @param blockName - имя блока в DOM (по умолчанию 'card')
+     * @param events - брокер событий
      */
     constructor(
         container: HTMLElement,
         actions?: ICardActions,
-        protected blockName: string = 'card'
+        protected blockName: string = 'card',
+        protected events?: IEvents
     ) {
         super(container);
 
@@ -90,6 +93,21 @@ export class Card extends Component<ICard> {
             this._description = ensureElement<HTMLElement>(`.${blockName}__text`, container);
         } catch (e) {
             this._description = undefined;
+        }
+
+        // Подписываемся на события корзины, если передан брокер событий
+        if (this.events) {
+            this.events.on('basket:changed', () => {
+                // Запрашиваем проверку наличия товара в корзине
+                this.events.emit('basket:check-product', { id: this.id });
+            });
+
+            this.events.on('basket:product-checked', (data: { id: string, inBasket: boolean }) => {
+                // Обновляем состояние кнопки, если это наша карточка
+                if (data.id === this.id) {
+                    this.selected = data.inBasket;
+                }
+            });
         }
     }
 

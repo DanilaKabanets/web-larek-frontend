@@ -13,7 +13,7 @@ export interface IFormData {
 /**
  * Базовый класс для представлений форм
  */
-export abstract class FormView<T extends IFormData> extends Component<T> {
+export class FormView<T extends IFormData> extends Component<T> {
     protected _submitButton: HTMLButtonElement;
     protected _formErrors: HTMLElement;
 
@@ -30,8 +30,9 @@ export abstract class FormView<T extends IFormData> extends Component<T> {
 
         try {
             this._formErrors = ensureElement<HTMLElement>('.form__errors', this.container);
+            this._submitButton = ensureElement<HTMLButtonElement>('button[type="submit"]', this.container);
         } catch (e) {
-            // Элемент для отображения ошибок отсутствует
+            // Элементы формы могут отсутствовать
         }
 
         // Базовый обработчик отправки формы
@@ -48,9 +49,11 @@ export abstract class FormView<T extends IFormData> extends Component<T> {
 
     /**
      * Метод, вызываемый при отправке формы
-     * Должен быть переопределен в наследниках
      */
-    protected abstract onSubmit(): void;
+    protected onSubmit(): void {
+        // Базовая реализация - просто генерируем событие отправки формы
+        this.events.emit('form:submit', this.container);
+    }
 
     /**
      * Отображает ошибки валидации формы
@@ -95,9 +98,11 @@ export abstract class FormView<T extends IFormData> extends Component<T> {
 
     /**
      * Метод для обработки изменений данных формы
-     * Должен быть переопределен в наследниках
      */
-    protected abstract onFormDataChanged(data: Partial<T>): void;
+    protected onFormDataChanged(data: Partial<T>): void {
+        // Базовая реализация - просто обновляем представление
+        this.updateFormView(data);
+    }
 
     /**
      * Устанавливает состояние валидации формы (активность кнопки отправки)
@@ -132,7 +137,10 @@ export abstract class FormView<T extends IFormData> extends Component<T> {
     /**
      * Дополнительная логика сброса формы для наследников
      */
-    protected abstract onReset(): void;
+    protected onReset(): void {
+        // Базовая реализация - просто сбрасываем форму
+        (this.container as HTMLFormElement).reset();
+    }
 
     /**
      * Обновляет представление формы на основе данных модели
@@ -145,5 +153,8 @@ export abstract class FormView<T extends IFormData> extends Component<T> {
     /**
      * Запрашивает данные формы от модели
      */
-    protected abstract requestFormData(): void;
+    protected requestFormData(): void {
+        // Базовая реализация - генерируем событие запроса данных
+        this.events.emit('form:request-data', this.container);
+    }
 } 

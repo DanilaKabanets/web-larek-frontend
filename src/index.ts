@@ -76,7 +76,10 @@ function initUIEvents() {
             const card = new Card(cardElement, {
                 onClick: () => events.emit('product:select', product)
             });
-            return card.render(product);
+            const renderedCard = card.render(product);
+            // Проверяем наличие товара в корзине
+            card.selected = basketModel.hasProduct(product.id);
+            return renderedCard;
         });
 
         page.store = cardElements;
@@ -91,9 +94,12 @@ function initUIEvents() {
                 modal.close();
             }
         });
-
-        modal.content = card.render(product);
+        const renderedCard = card.render(product);
+        // Проверяем наличие товара в корзине
+        card.selected = basketModel.hasProduct(product.id);
+        modal.content = renderedCard;
         modal.open();
+
     });
 }
 
@@ -105,6 +111,16 @@ function initOrderEvents() {
     events.on('basket:changed', () => {
         // Обновляем счетчик в шапке
         page.counter = basketModel.getProductCount();
+
+        // Обновляем состояние кнопок всех карточек
+        const products = pageModel.products;
+        products.forEach((product: IProduct) => {
+            const cardElement = document.querySelector(`[data-id="${product.id}"]`);
+            if (cardElement) {
+                const card = new Card(cardElement as HTMLElement);
+                card.selected = basketModel.hasProduct(product.id);
+            }
+        });
     });
 
     events.on('basket:get-products', () => {

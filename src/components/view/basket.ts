@@ -230,6 +230,20 @@ export class BasketView extends Component<IBasketData> implements IBasketView {
                     this.setText(element, (index + 1).toString());
                 });
 
+                // Проверяем, стала ли корзина пустой
+                if (this._list.children.length === 0) {
+                    // Создаем элемент для отображения сообщения о пустой корзине
+                    const emptyMessage = createElement('p', {
+                        textContent: 'Корзина пуста'
+                    });
+                    this._list.replaceChildren(emptyMessage);
+
+                    // Блокируем кнопку
+                    if (this._button) {
+                        this._button.disabled = true;
+                    }
+                }
+
                 return true;
             }
         } catch (e) {

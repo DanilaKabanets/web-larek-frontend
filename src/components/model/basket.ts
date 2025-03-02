@@ -67,6 +67,14 @@ export class BasketModel implements IBasketModel {
     }
 
     /**
+     * Проверяет, есть ли товар в корзине
+     * @param id - идентификатор товара
+     */
+    hasProduct(id: string): boolean {
+        return this.products.has(id);
+    }
+
+    /**
      * Очищает корзину
      */
     clearBasket(): void {
