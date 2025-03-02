@@ -31,7 +31,7 @@ export abstract class FormView<T extends IFormData> extends Component<T> {
         try {
             this._formErrors = ensureElement<HTMLElement>('.form__errors', this.container);
         } catch (e) {
-            console.warn('Элемент .form__errors не найден');
+            // Элемент для отображения ошибок отсутствует
         }
 
         // Базовый обработчик отправки формы

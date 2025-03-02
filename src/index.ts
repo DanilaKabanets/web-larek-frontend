@@ -117,8 +117,14 @@ function initOrderEvents() {
 
     events.on('basket:remove', (data: { id: string }) => {
         basketModel.removeProduct(data.id);
-        const basketItems = basketView.renderBasketItems(templates.basketItem);
-        basketView.items = basketItems;
+        // Обновление отображения произойдет автоматически через обработчик события basket:changed
+
+        // Удаляем элемент из DOM без полной перерисовки
+        basketView.removeItemFromList(data.id);
+
+        // Обновляем счетчик корзины и общую сумму
+        page.counter = basketModel.getProductCount();
+        events.emit('basket:get-total');
     });
 
     events.on('basket:open', () => {
@@ -211,8 +217,8 @@ function initOrderEvents() {
 
                 modal.content = successElement;
             })
-            .catch((error: Error) => {
-                console.error('Ошибка при оформлении заказа:', error);
+            .catch(() => {
+                // Ошибка при оформлении заказа обрабатывается тихо
             });
     });
 
@@ -240,8 +246,8 @@ function initApplication() {
         .then((products: IProduct[]) => {
             events.emit('products:changed', products);
         })
-        .catch(error => {
-            console.error('Ошибка при загрузке товаров:', error);
+        .catch(() => {
+            // Ошибка при загрузке товаров обрабатывается тихо
         });
 }
 

@@ -1,4 +1,4 @@
-import { handlePrice, cloneTemplate, ensureElement } from '../../utils/utils';
+import { handlePrice, cloneTemplate, ensureElement, ensureAllElements, createElement } from '../../utils/utils';
 import { Component } from '../base/component';
 import { IEvents } from '../base/events';
 import { IProduct } from '../../types';
@@ -47,7 +47,7 @@ export class BasketView extends Component<IBasketData> implements IBasketView {
             this._price = ensureElement<HTMLElement>(`.${blockName}__price`, container);
             this._list = ensureElement<HTMLElement>(`.${blockName}__list`, container);
         } catch (e) {
-            console.warn(`Ошибка при инициализации элементов корзины: ${e.message}`);
+            // Ошибка при инициализации элементов корзины
         }
 
         // Подписываемся на события модели для обновления представления
@@ -73,7 +73,7 @@ export class BasketView extends Component<IBasketData> implements IBasketView {
      */
     disableButton(): void {
         if (!this._button) {
-            console.error('Элемент с классом', `${this.blockName}__button`, 'не найден в корзине');
+            // Кнопка не найдена
             return;
         }
         this._button.disabled = true;
@@ -113,7 +113,7 @@ export class BasketView extends Component<IBasketData> implements IBasketView {
      */
     set items(items: HTMLElement[]) {
         if (!this._list) {
-            console.error('Элемент с классом', `${this.blockName}__list`, 'не найден в корзине');
+            // Список элементов не найден
             return;
         }
 
@@ -124,8 +124,9 @@ export class BasketView extends Component<IBasketData> implements IBasketView {
             if (this._button) this._button.disabled = true;
 
             // Создаем элемент для отображения сообщения о пустой корзине
-            const emptyMessage = document.createElement('p');
-            this.setText(emptyMessage, 'Корзина пуста');
+            const emptyMessage = createElement('p', {
+                textContent: 'Корзина пуста'
+            });
             this._list.replaceChildren(emptyMessage);
         }
     }
@@ -144,60 +145,98 @@ export class BasketView extends Component<IBasketData> implements IBasketView {
     renderBasketItems(template: HTMLTemplateElement): HTMLElement[] {
         let renderedItems: HTMLElement[] = [];
 
-        // Очищаем существующие элементы и их обработчики
-        if (this._list) {
-            // Сначала очищаем список
-            while (this._list.firstChild) {
-                this._list.removeChild(this._list.firstChild);
-            }
-        }
-
-        // Запрашиваем актуальные данные корзины и ожидаем ответ
+        // Получаем актуальные данные корзины
         this.events.emit('basket:get-products');
 
         // Подписываемся на событие с продуктами один раз для рендеринга
         const handleProducts = (products: IProduct[]) => {
-            // Очищаем предыдущие обработчики
+            // Очищаем подписку после получения данных
             this.events.off('basket:products', handleProducts);
 
-            // Обновляем состояние кнопки на основе полученных продуктов
+            // Обновляем состояние кнопки
             this.updateButtonState(products);
 
-            // Генерируем карточки на основе полученных данных
-            renderedItems = products.map((product, index) => {
-                const item = cloneTemplate<HTMLElement>(template);
+            // Создаем элементы товаров
+            renderedItems = products.map((product, index) => this.createBasketItemElement(product, index, template));
 
-                // Находим элементы для заполнения
-                const title = item.querySelector('.card__title');
-                const price = item.querySelector('.card__price');
-                const index_element = item.querySelector('.basket__item-index');
-                const deleteButton = item.querySelector('.basket__item-delete');
-
-                // Заполняем данные
-                if (title) this.setText(title as HTMLElement, product.title);
-                if (price) this.setText(price as HTMLElement, handlePrice(product.price) + ' синапсов');
-                if (index_element) this.setText(index_element as HTMLElement, (index + 1).toString());
-
-                // Добавляем обработчик для удаления
-                if (deleteButton) {
-                    // Добавляем новый обработчик без множественных назначений
-                    const clickHandler = () => {
-                        this.events.emit('basket:remove', { id: product.id });
-                    };
-
-                    // Используем более надежный подход
-                    deleteButton.addEventListener('click', clickHandler, { once: true });
-                }
-
-                return item;
-            });
-
-            // Обновляем представление корзины
+            // Обновляем DOM
             this.items = renderedItems;
         };
 
         this.events.on('basket:products', handleProducts);
 
         return renderedItems;
+    }
+
+    /**
+     * Создает элемент товара для корзины
+     */
+    private createBasketItemElement(product: IProduct, index: number, template: HTMLTemplateElement): HTMLElement {
+        const item = cloneTemplate<HTMLElement>(template);
+
+        // Находим элементы для заполнения
+        const title = item.querySelector('.card__title');
+        const price = item.querySelector('.card__price');
+        const indexElement = item.querySelector('.basket__item-index');
+        const deleteButton = item.querySelector('.basket__item-delete');
+
+        // Заполняем данные
+        if (title) this.setText(title as HTMLElement, product.title);
+        if (price) this.setText(price as HTMLElement, handlePrice(product.price) + ' синапсов');
+        if (indexElement) this.setText(indexElement as HTMLElement, (index + 1).toString());
+
+        // Добавляем обработчик для удаления
+        if (deleteButton) {
+            // Сохраняем ID товара в data-атрибуте для идентификации
+            (deleteButton as HTMLElement).dataset.productId = product.id;
+
+            // Добавляем обработчик события
+            const clickHandler = () => {
+                this.events.emit('basket:remove', { id: product.id });
+            };
+
+            // Используем { once: true } для автоматического удаления обработчика после вызова
+            deleteButton.addEventListener('click', clickHandler, { once: true });
+        }
+
+        return item;
+    }
+
+    /**
+     * Удаляет конкретный товар из DOM списка и обновляет индексацию
+     * @param productId - идентификатор товара для удаления
+     * @returns true, если элемент найден и удален, иначе false
+     */
+    removeItemFromList(productId: string): boolean {
+        if (!this._list) {
+            return false;
+        }
+
+        try {
+            // Ищем элемент для удаления по data-атрибуту
+            const selector = `.basket__item-delete[data-product-id="${productId}"]`;
+            const deleteButton = ensureElement<HTMLElement>(selector, this._list);
+
+            // Находим родительский элемент (карточку товара)
+            const itemElement = deleteButton.closest('.basket__item') || deleteButton.parentElement;
+
+            if (itemElement && itemElement.parentElement === this._list) {
+                // Удаляем элемент
+                this._list.removeChild(itemElement);
+
+                // Обновляем индексы оставшихся элементов
+                const itemElements = ensureAllElements<HTMLElement>('.basket__item-index', this._list);
+                itemElements.forEach((element, index) => {
+                    this.setText(element, (index + 1).toString());
+                });
+
+                return true;
+            }
+        } catch (e) {
+            // Элемент не найден
+            return false;
+        }
+
+        return false;
     }
 }
