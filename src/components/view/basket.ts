@@ -140,6 +140,14 @@ export class BasketView extends Component<IBasketData> implements IBasketView {
     renderBasketItems(template: HTMLTemplateElement): HTMLElement[] {
         let renderedItems: HTMLElement[] = [];
 
+        // Очищаем существующие элементы и их обработчики
+        if (this._list) {
+            // Сначала очищаем список
+            while (this._list.firstChild) {
+                this._list.removeChild(this._list.firstChild);
+            }
+        }
+
         // Запрашиваем актуальные данные корзины и ожидаем ответ
         this.events.emit('basket:get-products');
 
@@ -168,9 +176,13 @@ export class BasketView extends Component<IBasketData> implements IBasketView {
 
                 // Добавляем обработчик для удаления
                 if (deleteButton) {
-                    deleteButton.addEventListener('click', () => {
+                    // Добавляем новый обработчик без множественных назначений
+                    const clickHandler = () => {
                         this.events.emit('basket:remove', { id: product.id });
-                    });
+                    };
+
+                    // Используем более надежный подход
+                    deleteButton.addEventListener('click', clickHandler, { once: true });
                 }
 
                 return item;

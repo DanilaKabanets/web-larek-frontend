@@ -1,5 +1,5 @@
 import { IEvents } from '../base/events';
-import { TPaymentType, IOrder, FormData } from '../../types';
+import { TPaymentType, FormData } from '../../types';
 import { isEmpty } from '../../utils/utils';
 import { VALIDATION_ERRORS } from '../../utils/constants';
 
@@ -44,7 +44,7 @@ export class OrderModel implements IOrderModel {
      * Устанавливает адрес доставки
      * @param data - объект с данными адреса
      */
-    private setAddress(data: object): void {
+    public setAddress(data: object): void {
         const addressData = data as { value: string };
         this._address = addressData.value;
         this.validateAddress();
@@ -55,7 +55,7 @@ export class OrderModel implements IOrderModel {
      * Устанавливает способ оплаты
      * @param data - объект с данными способа оплаты
      */
-    private setPayment(data: object): void {
+    public setPayment(data: object): void {
         const paymentData = data as { value: TPaymentType };
         this._payment = paymentData.value;
         this.emitChange();
@@ -65,7 +65,7 @@ export class OrderModel implements IOrderModel {
      * Устанавливает адрес электронной почты
      * @param data - объект с данными email
      */
-    private setEmail(data: object): void {
+    public setEmail(data: object): void {
         const emailData = data as { value: string };
         this._email = emailData.value;
         this.validateEmail();
@@ -76,7 +76,7 @@ export class OrderModel implements IOrderModel {
      * Устанавливает номер телефона
      * @param data - объект с данными телефона
      */
-    private setPhone(data: object): void {
+    public setPhone(data: object): void {
         const phoneData = data as { value: string };
         this._phone = phoneData.value;
         this.validatePhone();
@@ -100,7 +100,7 @@ export class OrderModel implements IOrderModel {
     private validateEmail(): void {
         if (isEmpty(this._email)) {
             this.formErrors.email = VALIDATION_ERRORS.EMPTY_EMAIL;
-        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this._email)) {
+        } else if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(this._email)) {
             this.formErrors.email = VALIDATION_ERRORS.INVALID_EMAIL;
         } else {
             delete this.formErrors.email;
@@ -113,7 +113,7 @@ export class OrderModel implements IOrderModel {
     private validatePhone(): void {
         if (isEmpty(this._phone)) {
             this.formErrors.phone = VALIDATION_ERRORS.EMPTY_PHONE;
-        } else if (!/^(\+7|8)?[\s-]?\(?[489][0-9]{2}\)?[\s-]?[0-9]{3}[\s-]?[0-9]{2}[\s-]?[0-9]{2}$/.test(this._phone)) {
+        } else if (!/^(\+7|8)?\s*\(?\d{3}\)?[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}$/.test(this._phone)) {
             this.formErrors.phone = VALIDATION_ERRORS.INVALID_PHONE;
         } else {
             delete this.formErrors.phone;
@@ -127,6 +127,9 @@ export class OrderModel implements IOrderModel {
         this.validateAddress();
         this.validateEmail();
         this.validatePhone();
+
+        // Отправляем событие с обновленными данными после валидации
+        this.emitChange();
 
         return Object.keys(this.formErrors).length === 0;
     }
@@ -163,14 +166,17 @@ export class OrderModel implements IOrderModel {
      * Проверяет наличие данных адреса и способа оплаты
      */
     get hasAddressAndPayment(): boolean {
-        return !isEmpty(this._address);
+        // Проверяем наличие данных и отсутствие ошибок валидации
+        return !isEmpty(this._address) && !this.formErrors.address;
     }
 
     /**
      * Проверяет наличие данных контактов
      */
     get hasContacts(): boolean {
-        return !isEmpty(this._email) && !isEmpty(this._phone);
+        // Проверяем наличие данных и отсутствие ошибок валидации
+        return !isEmpty(this._email) && !isEmpty(this._phone) &&
+            !this.formErrors.email && !this.formErrors.phone;
     }
 
     /**
@@ -209,14 +215,13 @@ export class OrderModel implements IOrderModel {
      */
     private emitChange(): void {
         // Генерируем разные события в зависимости от того, какие данные изменились
-        if (this._address) {
-            this.events.emit('order:changed', {
-                address: this._address,
-                payment: this._payment,
-                hasAddressAndPayment: this.hasAddressAndPayment,
-                errors: this.formErrors
-            });
-        }
+        // Всегда отправляем событие order:changed, независимо от значения адреса
+        this.events.emit('order:changed', {
+            address: this._address,
+            payment: this._payment,
+            hasAddressAndPayment: this.hasAddressAndPayment,
+            errors: this.formErrors
+        });
 
         if (this._email || this._phone) {
             this.events.emit('contacts:changed', {

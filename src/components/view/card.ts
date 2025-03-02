@@ -1,6 +1,6 @@
 import { CategoryType } from '../../types';
 import { ensureElement } from '../../utils/utils';
-import { CDN_URL, categoryMapping } from '../../utils/constants';
+import { categoryMapping } from '../../utils/constants';
 import { Component } from '../base/component';
 import { handlePrice } from '../../utils/utils';
 

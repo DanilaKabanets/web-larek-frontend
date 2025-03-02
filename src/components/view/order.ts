@@ -1,34 +1,25 @@
-import { Component } from '../base/component';
 import { IEvents } from '../base/events';
 import { TPaymentType } from '../../types';
-import { ensureElement } from '../../utils/utils';
+import { ensureElement, ensureAllElements } from '../../utils/utils';
+import { FormView, IFormData } from './form';
 
 /**
  * Интерфейс данных заказа
  */
-export interface IOrderData {
+export interface IOrderData extends IFormData {
     address?: string;
-    email?: string;
-    phone?: string;
     payment?: TPaymentType;
+    hasAddressAndPayment?: boolean;
 }
 
 /**
- * Представление формы заказа
+ * Представление формы заказа (адрес и способ оплаты)
  */
-export class OrderView extends Component<IOrderData> {
-    // Элементы управления способом оплаты и адресом
-    protected _card: HTMLButtonElement;
-    protected _cash: HTMLButtonElement;
+export class OrderView extends FormView<IOrderData> {
+    protected _orderButtons: HTMLButtonElement[];
     protected _addressInput: HTMLInputElement;
     protected _submitButton: HTMLButtonElement;
-
-    // Элементы формы контактов
-    protected _phoneInput: HTMLInputElement;
-    protected _emailInput: HTMLInputElement;
-
-    // Флаг, указывающий, является ли текущая форма формой контактов
-    protected _isContactsForm = false;
+    protected _formErrors: HTMLElement;
 
     /**
      * Создаёт экземпляр представления формы заказа
@@ -37,216 +28,107 @@ export class OrderView extends Component<IOrderData> {
      */
     constructor(
         container: HTMLFormElement,
-        private events: IEvents
+        events: IEvents
     ) {
-        super(container);
+        super(container, events);
 
-        // Определяем тип формы по наличию элементов
-        this._isContactsForm = Boolean(container.elements.namedItem('email'));
+        // Инициализация элементов формы
+        this._orderButtons = Array.from(ensureAllElements<HTMLButtonElement>('.button_alt', this.container));
+        this._addressInput = ensureElement<HTMLInputElement>('input[name="address"]', this.container);
+        this._submitButton = ensureElement<HTMLButtonElement>('button[type="submit"]', this.container);
 
-        if (this._isContactsForm) {
-            // Инициализация формы контактов
-            this.initContactsForm(container);
-        } else {
-            // Инициализация формы заказа (адрес и способ оплаты)
-            this.initOrderForm(container);
+        try {
+            this._formErrors = ensureElement<HTMLElement>('.form__errors', this.container);
+        } catch (e) {
+            console.warn('Элемент .form__errors не найден');
         }
-
-        // Подписываемся на изменения модели
-        if (this._isContactsForm) {
-            this.events.on('contacts:changed', (data: object) => {
-                const typedData = data as { email: string, phone: string, hasContacts: boolean };
-                this.updateContactsView(typedData);
-            });
-        } else {
-            this.events.on('order:changed', (data: object) => {
-                const typedData = data as { address: string, payment: TPaymentType, hasAddressAndPayment: boolean };
-                this.updateOrderView(typedData);
-            });
-        }
-    }
-
-    /**
-     * Инициализирует форму заказа (адрес и способ оплаты)
-     * @param container - HTML-элемент формы
-     */
-    private initOrderForm(container: HTMLFormElement): void {
-        // Получаем ссылки на элементы формы с использованием ensureElement
-        this._card = container.elements.namedItem('card') as HTMLButtonElement;
-        this._cash = container.elements.namedItem('cash') as HTMLButtonElement;
-        this._addressInput = container.elements.namedItem('address') as HTMLInputElement;
-        this._submitButton = ensureElement<HTMLButtonElement>('button[type="submit"]', container);
-
-        // По умолчанию кнопка отправки неактивна
-        this._submitButton.disabled = true;
 
         // Обработчики для кнопок способа оплаты
-        if (this._cash) {
-            this._cash.addEventListener('click', () => {
-                this._cash.classList.add('button_alt-active');
-                this._card.classList.remove('button_alt-active');
-                // Отправляем событие об изменении способа оплаты
-                this.events.emit('payment:set', { value: 'paymentOnDelivery' });
+        this._orderButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                this.setPaymentMethod(button.name);
+                this.events.emit('payment:set', { value: button.name === 'card' ? 'online' : 'paymentOnDelivery' });
             });
-        }
-        if (this._card) {
-            this._card.addEventListener('click', () => {
-                this._card.classList.add('button_alt-active');
-                this._cash.classList.remove('button_alt-active');
-                // Отправляем событие об изменении способа оплаты
-                this.events.emit('payment:set', { value: 'online' });
-            });
-        }
+        });
 
-        // Добавляем обработчик события ввода для поля адреса
-        if (this._addressInput) {
-            this._addressInput.addEventListener('input', () => {
-                // Отправляем событие об изменении адреса
-                this.events.emit('address:set', { value: this._addressInput.value });
-            });
-        }
+        // Обработчик события ввода для поля адреса
+        this.container.addEventListener('input', (evt: Event) => {
+            const target = evt.target as HTMLInputElement;
+            if (target.name === 'address') {
+                this.events.emit('address:set', { value: target.value });
+            }
+        });
 
-        // Добавляем обработчик отправки формы
-        container.addEventListener('submit', (event) => {
+        // Обработчик отправки формы
+        this.container.addEventListener('submit', (event) => {
             event.preventDefault();
             this.events.emit('order:submit');
         });
-    }
 
-    /**
-     * Инициализирует форму контактов
-     * @param container - HTML-элемент формы
-     */
-    private initContactsForm(container: HTMLFormElement): void {
-        // Получаем ссылки на элементы формы
-        this._phoneInput = container.elements.namedItem('phone') as HTMLInputElement;
-        this._emailInput = container.elements.namedItem('email') as HTMLInputElement;
-        this._submitButton = ensureElement<HTMLButtonElement>('button[type="submit"]', container);
-
-        // По умолчанию кнопка отправки неактивна
-        this._submitButton.disabled = true;
-
-        // Добавляем обработчики событий ввода
-        if (this._phoneInput) {
-            this._phoneInput.addEventListener('input', () => {
-                // Просто отправляем событие об изменении значения
-                this.emitInputValue(this._phoneInput, 'phone:set');
-            });
-        }
-
-        if (this._emailInput) {
-            this._emailInput.addEventListener('input', () => {
-                // Просто отправляем событие об изменении значения
-                this.emitInputValue(this._emailInput, 'email:set');
-            });
-        }
-
-        // Добавляем обработчик отправки формы
-        container.addEventListener('submit', (event) => {
-            event.preventDefault();
-
-            // Собираем данные из формы контактов
-            if (this._emailInput && this._phoneInput) {
-                this.events.emit('contacts:submit', {
-                    email: this._emailInput.value,
-                    phone: this._phoneInput.value
-                });
-            }
+        // Подписываемся на изменения модели
+        this.events.on('order:changed', (data: object) => {
+            const typedData = data as {
+                address: string,
+                payment: TPaymentType,
+                hasAddressAndPayment: boolean,
+                errors: Partial<Record<string, string>>
+            };
+            this.updateFormView(typedData, 'hasAddressAndPayment');
         });
     }
 
     /**
-     * Отправляет событие об изменении значения поля ввода
-     * @param input - поле ввода
-     * @param eventName - имя события для отправки
+     * Обработчик отправки формы
      */
-    private emitInputValue(input: HTMLInputElement, eventName: string): void {
-        const value = input.value;
-        // Отправляем событие об изменении значения
-        this.events.emit(eventName, { value });
+    protected onSubmit(): void {
+        this.events.emit('order:submit');
     }
 
     /**
-     * Обновляет представление формы заказа на основе данных модели
+     * Устанавливает способ оплаты и обновляет UI
      */
-    updateOrderView(data: { address: string, payment: TPaymentType, hasAddressAndPayment: boolean }): void {
-        // Обновляем состояние кнопки отправки формы
-        if (this._submitButton) {
-            this._submitButton.disabled = !data.hasAddressAndPayment;
-        }
+    setPaymentMethod(payMethod: string): void {
+        this._orderButtons.forEach(button => {
+            button.classList.toggle('button_alt-active', button.name === payMethod);
+        });
+    }
 
+    /**
+     * Обработка изменений данных формы
+     */
+    protected onFormDataChanged(data: Partial<IOrderData>): void {
         // Обновляем состояние кнопок способа оплаты
         if (data.payment === 'online') {
-            this._card.classList.add('button_alt-active');
-            this._cash.classList.remove('button_alt-active');
+            this.setPaymentMethod('card');
         } else if (data.payment === 'paymentOnDelivery') {
-            this._cash.classList.add('button_alt-active');
-            this._card.classList.remove('button_alt-active');
-        } else {
-            this._cash.classList.remove('button_alt-active');
-            this._card.classList.remove('button_alt-active');
+            this.setPaymentMethod('cash');
         }
 
         // Обновляем значение поля адреса
-        if (this._addressInput) {
+        if (this._addressInput && data.address !== undefined) {
             this._addressInput.value = data.address;
         }
     }
 
     /**
-     * Обновляет представление формы контактов на основе данных модели
+     * Запрашивает данные формы от модели
      */
-    updateContactsView(data: { email: string, phone: string, hasContacts: boolean }): void {
-        // Обновляем состояние кнопки отправки формы
-        if (this._submitButton) {
-            this._submitButton.disabled = !data.hasContacts;
-        }
-
-        // Обновляем значения полей формы
-        if (this._phoneInput) {
-            this._phoneInput.value = data.phone;
-        }
-
-        if (this._emailInput) {
-            this._emailInput.value = data.email;
-        }
+    protected requestFormData(): void {
+        this.events.emit('order:get-data');
     }
 
     /**
-     * Обновляет представление формы на основе данных модели
+     * Дополнительная логика сброса формы
      */
-    updateView(): void {
-        // Запрашиваем актуальные данные у модели
-        if (this._isContactsForm) {
-            this.events.emit('contacts:get-data');
-        } else {
-            this.events.emit('order:get-data');
-        }
-    }
+    protected onReset(): void {
+        // Сбрасываем кнопки способа оплаты
+        this._orderButtons.forEach(button => {
+            button.classList.remove('button_alt-active');
+        });
 
-    /**
-     * Сбрасывает форму
-     */
-    reset(): void {
-        if (this._isContactsForm) {
-            // Сбрасываем форму контактов
-            if (this._phoneInput) {
-                this._phoneInput.value = '';
-            }
-            if (this._emailInput) {
-                this._emailInput.value = '';
-            }
-        } else {
-            // Сбрасываем форму заказа
-            this._cash.classList.remove('button_alt-active');
-            this._card.classList.remove('button_alt-active');
-            if (this._addressInput) {
-                this._addressInput.value = '';
-            }
-        }
-
-        if (this._submitButton) {
-            this._submitButton.disabled = true;
+        // Сбрасываем поле адреса
+        if (this._addressInput) {
+            this._addressInput.value = '';
         }
 
         // Отправляем событие сброса формы

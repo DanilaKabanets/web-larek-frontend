@@ -100,22 +100,23 @@
 		<div class="modal__container">
 			<button class="modal__close" aria-label="закрыть"></button>
 			<div class="modal__content">
-				<form class="form">
+				<form class="form" name="order" novalidate>
 					<div class="order">
 						<div class="order__field">
 							<h2 class="modal__title">Способ оплаты</h2>
 							<div class="order__buttons">
-								<button type="button" class="button button_alt">Онлайн</button>
-								<button type="button" class="button button_alt">При получении</button>
+								<button name="card" type="button" class="button button_alt">Онлайн</button>
+								<button name="cash" type="button" class="button button_alt">При получении</button>
 							</div>
 						</div>
 						<label class="order__field">
 							<span class="form__label modal__title">Адрес доставки</span>
-							<input class="form__input" type="text" placeholder="Введите адрес" />
+							<input name="address" class="form__input" type="text" placeholder="Введите адрес" />
 						</label>
 					</div>
 					<div class="modal__actions">
-						<button disabled class="button">Далее</button>
+						<button type="submit" disabled class="button order__button">Далее</button>
+						<span class="form__errors"></span>
 					</div>
 				</form>
 			</div>
@@ -126,22 +127,20 @@
 		<div class="modal__container">
 			<button class="modal__close" aria-label="закрыть"></button>
 			<div class="modal__content">
-				<form class="form">
+				<form class="form" name="contacts" novalidate>
 					<div class="order">
 						<label class="order__field">
 							<span class="form__label modal__title">Email</span>
-							<input name="email" class="form__input" type="email" placeholder="Введите Email"
-								pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
-								title="Введите корректный email (например, example@domain.com)" required />
+							<input name="email" class="form__input" type="text" placeholder="Введите Email" />
 						</label>
 						<label class="order__field">
 							<span class="form__label modal__title">Телефон</span>
-							<input name="phone" class="form__input" type="tel" placeholder="+7" pattern="\+7\d{10}"
-								title="Введите телефон в формате +7XXXXXXXXXX" required />
+							<input name="phone" class="form__input" type="text" placeholder="+7" />
 						</label>
 					</div>
 					<div class="modal__actions">
-						<button disabled class="button">Оплатить</button>
+						<button type="submit" disabled class="button">Оплатить</button>
+						<span class="form__errors"></span>
 					</div>
 				</form>
 			</div>
@@ -214,7 +213,7 @@
 	</template>
 
 	<template id="order">
-		<form class="form" name="order">
+		<form class="form" name="order" novalidate>
 			<div class="order">
 				<div class="order__field">
 					<h2 class="modal__title">Способ оплаты</h2>
@@ -236,18 +235,15 @@
 	</template>
 
 	<template id="contacts">
-		<form class="form" name="contacts">
+		<form class="form" name="contacts" novalidate>
 			<div class="order">
 				<label class="order__field">
 					<span class="form__label modal__title">Email</span>
-					<input name="email" class="form__input" type="email" placeholder="Введите Email"
-						pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
-						title="Введите корректный email (например, example@domain.com)" required />
+					<input name="email" class="form__input" type="text" placeholder="Введите Email" />
 				</label>
 				<label class="order__field">
 					<span class="form__label modal__title">Телефон</span>
-					<input name="phone" class="form__input" type="tel" placeholder="+7" pattern="\+7\d{10}"
-						title="Введите телефон в формате +7XXXXXXXXXX" required />
+					<input name="phone" class="form__input" type="text" placeholder="+7" />
 				</label>
 			</div>
 			<div class="modal__actions">

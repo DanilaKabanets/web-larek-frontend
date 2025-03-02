@@ -1,4 +1,4 @@
-import { IProduct } from '../../types';
+import { IProduct, FormData, IOrder } from '../../types';
 import { IEvents } from '../base/events';
 import { isEmpty } from '../../utils/utils';
 
@@ -9,6 +9,7 @@ export interface IBasketModel {
     getProducts(): IProduct[];
     getTotal(): number;
     getProductCount(): number;
+    createOrderData(formData: FormData): IOrder;
 }
 
 /**
@@ -38,7 +39,7 @@ export class BasketModel implements IBasketModel {
      * Удаляет товар из корзины
      * @param id - идентификатор товара
      */
-    private removeProduct(id: string): void {
+    public removeProduct(id: string): void {
         this.products.delete(id);
         this.emitChange();
     }
@@ -71,6 +72,22 @@ export class BasketModel implements IBasketModel {
     clearBasket(): void {
         this.products.clear();
         this.emitChange();
+    }
+
+    /**
+     * Формирует данные заказа для отправки на сервер
+     * @param formData - данные из формы заказа
+     * @returns объект заказа для отправки на сервер
+     */
+    createOrderData(formData: FormData): IOrder {
+        return {
+            payment: formData.payment,
+            email: formData.email,
+            phone: formData.phone,
+            address: formData.address,
+            total: this.getTotal(),
+            items: this.getProducts().map(item => item.id)
+        };
     }
 
     /**
