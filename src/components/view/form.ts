@@ -59,13 +59,13 @@ export abstract class FormView<T extends IFormData> extends Component<T> {
         if (!this._formErrors) return;
 
         // Очищаем предыдущие ошибки
-        this._formErrors.textContent = '';
+        this.setText(this._formErrors, '');
 
         if (errors) {
             // Собираем все ошибки в одну строку
             const errorMessages = Object.values(errors).filter(Boolean);
             if (errorMessages.length > 0) {
-                this._formErrors.textContent = errorMessages.join(', ');
+                this.setText(this._formErrors, errorMessages.join(', '));
                 this._formErrors.classList.add('form__errors_visible');
             } else {
                 this._formErrors.classList.remove('form__errors_visible');
@@ -121,7 +121,7 @@ export abstract class FormView<T extends IFormData> extends Component<T> {
 
         // Очищаем ошибки
         if (this._formErrors) {
-            this._formErrors.textContent = '';
+            this.setText(this._formErrors, '');
             this._formErrors.classList.remove('form__errors_visible');
         }
 

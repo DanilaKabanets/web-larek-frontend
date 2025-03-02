@@ -39,7 +39,7 @@ export class SuccessView extends Component<ISuccessData> {
      * @param total - итоговая сумма заказа
      */
     set total(total: number) {
-        this._totalElement.textContent = `Списано ${total} синапсов`;
+        this.setText(this._totalElement, `Списано ${total} синапсов`);
     }
 
     /**

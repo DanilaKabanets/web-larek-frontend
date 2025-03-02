@@ -1,4 +1,4 @@
-import { handlePrice, cloneTemplate, ensureElement, createElement } from '../../utils/utils';
+import { handlePrice, cloneTemplate, ensureElement } from '../../utils/utils';
 import { Component } from '../base/component';
 import { IEvents } from '../base/events';
 import { IProduct } from '../../types';
@@ -95,7 +95,7 @@ export class BasketView extends Component<IBasketData> implements IBasketView {
      */
     private updatePrice(total: number): void {
         if (this._price) {
-            this._price.textContent = handlePrice(total) + ' синапсов';
+            this.setText(this._price, handlePrice(total) + ' синапсов');
         }
     }
 
@@ -122,7 +122,11 @@ export class BasketView extends Component<IBasketData> implements IBasketView {
             if (this._button) this._button.disabled = false;
         } else {
             if (this._button) this._button.disabled = true;
-            this._list.replaceChildren(createElement<HTMLParagraphElement>('p', { textContent: 'Корзина пуста' }));
+
+            // Создаем элемент для отображения сообщения о пустой корзине
+            const emptyMessage = document.createElement('p');
+            this.setText(emptyMessage, 'Корзина пуста');
+            this._list.replaceChildren(emptyMessage);
         }
     }
 
@@ -170,9 +174,9 @@ export class BasketView extends Component<IBasketData> implements IBasketView {
                 const deleteButton = item.querySelector('.basket__item-delete');
 
                 // Заполняем данные
-                if (title) title.textContent = product.title;
-                if (price) price.textContent = handlePrice(product.price) + ' синапсов';
-                if (index_element) index_element.textContent = (index + 1).toString();
+                if (title) this.setText(title as HTMLElement, product.title);
+                if (price) this.setText(price as HTMLElement, handlePrice(product.price) + ' синапсов');
+                if (index_element) this.setText(index_element as HTMLElement, (index + 1).toString());
 
                 // Добавляем обработчик для удаления
                 if (deleteButton) {

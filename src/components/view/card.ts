@@ -98,7 +98,7 @@ export class Card extends Component<ICard> {
      */
     set title(value: string) {
         if (this._title) {
-            this._title.textContent = value;
+            this.setText(this._title, value);
         }
     }
 
@@ -107,7 +107,7 @@ export class Card extends Component<ICard> {
      */
     set price(value: number | null) {
         if (this._price) {
-            this._price.textContent = value ? handlePrice(value) + ' синапсов' : 'Бесценно';
+            this.setText(this._price, value ? handlePrice(value) + ' синапсов' : 'Бесценно');
         }
 
         // Дополнительная логика для карточки товара
@@ -150,7 +150,7 @@ export class Card extends Component<ICard> {
      */
     set category(value: CategoryType | string) {
         if (this._category && value) {
-            this._category.textContent = value;
+            this.setText(this._category, value);
             // Очищаем предыдущие классы категорий
             Object.values(categoryMapping).forEach(cls => {
                 this._category.classList.remove(cls);
@@ -167,7 +167,7 @@ export class Card extends Component<ICard> {
      */
     set description(value: string) {
         if (this._description && value) {
-            this._description.textContent = value;
+            this.setText(this._description, value);
         }
     }
 
