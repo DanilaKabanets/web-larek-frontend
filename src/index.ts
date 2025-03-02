@@ -1,6 +1,6 @@
 import './scss/styles.scss';
 
-import { WebLarekAPI } from './components/base/webLarekAPI';
+import { WebLarekAPI } from './components/webLarekAPI';
 import { BasketModel } from './components/model/basket';
 import { PageModel } from './components/model/page';
 import { OrderModel } from './components/model/order';
@@ -11,7 +11,7 @@ import { OrderView } from './components/view/order';
 import { BasketView } from './components/view/basket';
 
 import { EventEmitter } from './components/base/events';
-import { IProduct, IOrder, TPaymentType, IOrderSuccess } from './types';
+import { IProduct, IOrder, TPaymentType, IOrderSuccess, FormData } from './types';
 import { ensureElement, cloneTemplate, handlePrice, isBoolean } from './utils/utils';
 import { Card } from './components/view/card';
 import { API_URL } from './utils/constants';
@@ -90,8 +90,7 @@ events.on('product:select', (product: IProduct) => {
 // Обновление состояния корзины
 events.on('basket:changed', (items: IProduct[]) => {
     // Обновляем счетчик в шапке
-    page.counter = items.length;
-    pageModel.setBasketCount(items.length);
+    page.counter = basketModel.getProductCount();
 });
 
 // Открытие корзины
@@ -135,16 +134,15 @@ events.on('order:submit', () => {
 });
 
 // Обработка отправки заказа
-events.on('order:data', (orderData: unknown) => {
+events.on('order:data', (orderData: FormData) => {
     // Формируем данные для отправки
     const basketItems = basketModel.getProducts().map(item => item.id);
-    const typedOrderData = orderData as { email: string; phone: string; address: string; payment: TPaymentType };
 
     const orderDto: IOrder = {
-        payment: typedOrderData.payment,
-        email: typedOrderData.email,
-        phone: typedOrderData.phone,
-        address: typedOrderData.address,
+        payment: orderData.payment,
+        email: orderData.email,
+        phone: orderData.phone,
+        address: orderData.address,
         total: basketModel.getTotal(),
         items: basketItems
     };

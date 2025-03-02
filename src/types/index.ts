@@ -29,6 +29,8 @@ export interface IOrder {
     payment: TPaymentType;
 }
 
+export type FormData = Omit<IOrder, 'total' | 'items'>;
+
 export interface IOrderSuccess {
     id: string;
     total: number;

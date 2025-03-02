@@ -7,7 +7,6 @@ import { isEmpty } from '../../utils/utils';
  */
 export interface IPageData {
     products: IProduct[];
-    basketCount: number;
     isLocked: boolean;
 }
 
@@ -16,10 +15,8 @@ export interface IPageData {
  */
 export interface IPageModel {
     products: IProduct[];
-    basketCount: number;
     isLocked: boolean;
     setProducts(products: IProduct[]): void;
-    setBasketCount(count: number): void;
     setLocked(isLocked: boolean): void;
 }
 
@@ -29,7 +26,6 @@ export interface IPageModel {
 export class PageModel implements IPageModel {
     // Данные страницы
     private _products: IProduct[] = [];
-    private _basketCount = 0;
     private _isLocked = false;
 
     /**
@@ -52,17 +48,8 @@ export class PageModel implements IPageModel {
     }
 
     /**
-     * Устанавливает количество товаров в корзине
-     * @param count - количество товаров
-     */
-    setBasketCount(count: number): void {
-        this._basketCount = count;
-        this.emitChange();
-    }
-
-    /**
-     * Устанавливает состояние блокировки страницы
-     * @param isLocked - флаг блокировки
+     * Устанавливает флаг блокировки страницы
+     * @param isLocked - значение флага блокировки
      */
     setLocked(isLocked: boolean): void {
         this._isLocked = isLocked;
@@ -77,26 +64,18 @@ export class PageModel implements IPageModel {
     }
 
     /**
-     * Возвращает количество товаров в корзине
-     */
-    get basketCount(): number {
-        return this._basketCount;
-    }
-
-    /**
-     * Возвращает состояние блокировки страницы
+     * Возвращает статус блокировки страницы
      */
     get isLocked(): boolean {
         return this._isLocked;
     }
 
     /**
-     * Генерирует событие изменения данных страницы
+     * Генерирует событие изменения модели страницы
      */
     private emitChange(): void {
         this.events.emit('page:changed', {
             products: this.products,
-            basketCount: this.basketCount,
             isLocked: this.isLocked
         });
     }

@@ -132,7 +132,7 @@ export class Card extends Component<ICard> {
      */
     set image(value: string) {
         if (this._image && value) {
-            this._image.src = `${CDN_URL}${value}`;
+            this._image.src = value;
         }
     }
 

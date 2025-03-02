@@ -1,6 +1,7 @@
 import { IEvents } from '../base/events';
-import { TPaymentType, IOrder } from '../../types';
+import { TPaymentType, IOrder, FormData } from '../../types';
 import { isEmpty } from '../../utils/utils';
+import { VALIDATION_ERRORS } from '../../utils/constants';
 
 /**
  * Интерфейс модели формы заказа
@@ -13,8 +14,10 @@ export interface IOrderModel {
     hasAddressAndPayment: boolean;
     hasContacts: boolean;
     isFormFilled: boolean;
-    getData(): Omit<IOrder, 'total' | 'items'>;
+    formErrors: Partial<Record<keyof FormData, string>>;
+    getData(): FormData;
     reset(): void;
+    validateForm(): boolean;
 }
 
 /**
@@ -23,21 +26,18 @@ export interface IOrderModel {
 export class OrderModel implements IOrderModel {
     // Данные заказа
     private _address = '';
-    private _payment: TPaymentType | null = null;
+    private _payment: TPaymentType = 'online';
     private _email = '';
     private _phone = '';
+
+    // Ошибки валидации полей формы
+    formErrors: Partial<Record<keyof FormData, string>> = {};
 
     /**
      * Создаёт экземпляр модели формы заказа
      * @param events - брокер событий
      */
     constructor(private events: IEvents) {
-        // Подписываемся на события ввода пользователя от представления
-        this.events.on('address:set', (data: object) => this.setAddress(data));
-        this.events.on('payment:set', (data: object) => this.setPayment(data));
-        this.events.on('email:set', (data: object) => this.setEmail(data));
-        this.events.on('phone:set', (data: object) => this.setPhone(data));
-        this.events.on('order:reset', () => this.reset());
     }
 
     /**
@@ -47,6 +47,7 @@ export class OrderModel implements IOrderModel {
     private setAddress(data: object): void {
         const addressData = data as { value: string };
         this._address = addressData.value;
+        this.validateAddress();
         this.emitChange();
     }
 
@@ -67,6 +68,7 @@ export class OrderModel implements IOrderModel {
     private setEmail(data: object): void {
         const emailData = data as { value: string };
         this._email = emailData.value;
+        this.validateEmail();
         this.emitChange();
     }
 
@@ -77,7 +79,56 @@ export class OrderModel implements IOrderModel {
     private setPhone(data: object): void {
         const phoneData = data as { value: string };
         this._phone = phoneData.value;
+        this.validatePhone();
         this.emitChange();
+    }
+
+    /**
+     * Валидирует адрес доставки
+     */
+    private validateAddress(): void {
+        if (isEmpty(this._address)) {
+            this.formErrors.address = VALIDATION_ERRORS.EMPTY_ADDRESS;
+        } else {
+            delete this.formErrors.address;
+        }
+    }
+
+    /**
+     * Валидирует email
+     */
+    private validateEmail(): void {
+        if (isEmpty(this._email)) {
+            this.formErrors.email = VALIDATION_ERRORS.EMPTY_EMAIL;
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this._email)) {
+            this.formErrors.email = VALIDATION_ERRORS.INVALID_EMAIL;
+        } else {
+            delete this.formErrors.email;
+        }
+    }
+
+    /**
+     * Валидирует телефон
+     */
+    private validatePhone(): void {
+        if (isEmpty(this._phone)) {
+            this.formErrors.phone = VALIDATION_ERRORS.EMPTY_PHONE;
+        } else if (!/^(\+7|8)?[\s-]?\(?[489][0-9]{2}\)?[\s-]?[0-9]{3}[\s-]?[0-9]{2}[\s-]?[0-9]{2}$/.test(this._phone)) {
+            this.formErrors.phone = VALIDATION_ERRORS.INVALID_PHONE;
+        } else {
+            delete this.formErrors.phone;
+        }
+    }
+
+    /**
+     * Валидирует все поля формы
+     */
+    validateForm(): boolean {
+        this.validateAddress();
+        this.validateEmail();
+        this.validatePhone();
+
+        return Object.keys(this.formErrors).length === 0;
     }
 
     /**
@@ -112,7 +163,7 @@ export class OrderModel implements IOrderModel {
      * Проверяет наличие данных адреса и способа оплаты
      */
     get hasAddressAndPayment(): boolean {
-        return !isEmpty(this._address) && !isEmpty(this._payment);
+        return !isEmpty(this._address);
     }
 
     /**
@@ -132,7 +183,7 @@ export class OrderModel implements IOrderModel {
     /**
      * Возвращает данные формы заказа
      */
-    getData(): Omit<IOrder, 'total' | 'items'> {
+    getData(): FormData {
         return {
             address: this._address,
             payment: this._payment,
@@ -146,9 +197,10 @@ export class OrderModel implements IOrderModel {
      */
     reset(): void {
         this._address = '';
-        this._payment = null;
+        this._payment = 'online';
         this._email = '';
         this._phone = '';
+        this.formErrors = {};
         this.emitChange();
     }
 
@@ -157,11 +209,12 @@ export class OrderModel implements IOrderModel {
      */
     private emitChange(): void {
         // Генерируем разные события в зависимости от того, какие данные изменились
-        if (this._address || this._payment !== null) {
+        if (this._address) {
             this.events.emit('order:changed', {
                 address: this._address,
                 payment: this._payment,
-                hasAddressAndPayment: this.hasAddressAndPayment
+                hasAddressAndPayment: this.hasAddressAndPayment,
+                errors: this.formErrors
             });
         }
 
@@ -169,11 +222,15 @@ export class OrderModel implements IOrderModel {
             this.events.emit('contacts:changed', {
                 email: this._email,
                 phone: this._phone,
-                hasContacts: this.hasContacts
+                hasContacts: this.hasContacts,
+                errors: this.formErrors
             });
         }
 
         // Общее событие изменения заказа
-        this.events.emit('order:full-changed', this.getData());
+        this.events.emit('order:full-changed', {
+            ...this.getData(),
+            errors: this.formErrors
+        });
     }
 } 

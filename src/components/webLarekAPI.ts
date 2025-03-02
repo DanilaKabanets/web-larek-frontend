@@ -1,6 +1,6 @@
-import { IProduct, IOrder, IOrderSuccess } from "../../types";
-import { Api, ApiListResponse } from "../base/api";
-import { CDN_URL } from "../../utils/constants";
+import { IProduct, IOrder, IOrderSuccess } from "../types";
+import { Api, ApiListResponse } from "./base/api";
+import { CDN_URL } from "../utils/constants";
 
 /**
  * Интерфейс для API WebLarek
@@ -16,7 +16,7 @@ export interface IWebLarekAPI {
 export class WebLarekAPI extends Api implements IWebLarekAPI {
     readonly cdn: string;
 
-    constructor(protected readonly resource: string, baseUrl: string, options?: RequestInit) {
+    constructor(cdn: string, baseUrl: string, options?: RequestInit) {
         super(baseUrl, options);
         this.cdn = CDN_URL;
     }
@@ -27,7 +27,8 @@ export class WebLarekAPI extends Api implements IWebLarekAPI {
     getProductItems(): Promise<IProduct[]> {
         return this.get('/product').then((data: ApiListResponse<IProduct>) =>
             data.items.map((item) => ({
-                ...item
+                ...item,
+                image: this.cdn + item.image
             }))
         );
     }

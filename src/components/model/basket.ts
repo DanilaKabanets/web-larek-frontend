@@ -8,6 +8,7 @@ import { isEmpty } from '../../utils/utils';
 export interface IBasketModel {
     getProducts(): IProduct[];
     getTotal(): number;
+    getProductCount(): number;
 }
 
 /**
@@ -22,25 +23,6 @@ export class BasketModel implements IBasketModel {
      * @param events - брокер событий
      */
     constructor(protected events: IEvents) {
-        // Подписываемся на события от представления
-        this.events.on('basket:get-products', () => {
-            this.events.emit('basket:products', this.getProducts());
-        });
-
-        this.events.on('basket:get-total', () => {
-            this.events.emit('basket:total-updated', { value: this.getTotal() });
-        });
-
-        this.events.on('basket:remove', (data: object) => {
-            this.removeProduct((data as { id: string }).id);
-        });
-
-        this.events.on('basket:checkout', () => {
-            this.events.emit('basket:order', {
-                products: this.getProducts(),
-                total: this.getTotal()
-            });
-        });
     }
 
     /**
@@ -66,6 +48,13 @@ export class BasketModel implements IBasketModel {
      */
     getProducts(): IProduct[] {
         return Array.from(this.products.values());
+    }
+
+    /**
+     * Возвращает количество товаров в корзине
+     */
+    getProductCount(): number {
+        return this.getProducts().length;
     }
 
     /**
